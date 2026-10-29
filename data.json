@@ -1,0 +1,115 @@
+{
+ "tablas": [
+  {
+   "nombre": "fct_order_items",
+   "grano": "Una línea de orden",
+   "filas": 112650
+  },
+  {
+   "nombre": "fct_orders",
+   "grano": "Una orden",
+   "filas": 99441
+  },
+  {
+   "nombre": "dim_customers",
+   "grano": "Un cliente real",
+   "filas": 96096
+  },
+  {
+   "nombre": "dim_products",
+   "grano": "Un producto",
+   "filas": 32951
+  },
+  {
+   "nombre": "dim_sellers",
+   "grano": "Un vendedor",
+   "filas": 3095
+  },
+  {
+   "nombre": "dim_date",
+   "grano": "Un día",
+   "filas": 1096
+  }
+ ],
+ "kpis": {
+  "facturacion": 15424463.65,
+  "ordenes": 96478,
+  "ticket": 159.87544984348764,
+  "tasa_atraso": 0.08112366538820359,
+  "nota": 4.155908256114867
+ },
+ "recompra": 0.031187562437562436,
+ "categorias": [
+  {
+   "categoria": "health_beauty",
+   "facturacion": 1412271.15
+  },
+  {
+   "categoria": "watches_gifts",
+   "facturacion": 1264333.12
+  },
+  {
+   "categoria": "bed_bath_table",
+   "facturacion": 1225209.26
+  },
+  {
+   "categoria": "sports_leisure",
+   "facturacion": 1119923.63
+  },
+  {
+   "categoria": "computers_accessories",
+   "facturacion": 1032723.77
+  },
+  {
+   "categoria": "furniture_decor",
+   "facturacion": 881063.91
+  },
+  {
+   "categoria": "housewares",
+   "facturacion": 759313.29
+  },
+  {
+   "categoria": "cool_stuff",
+   "facturacion": 691680.89
+  }
+ ],
+ "atraso_vs_nota": [
+  {
+   "entrega": "Llegó a tiempo",
+   "nota": 4.294114310992139,
+   "ordenes": 88163
+  },
+  {
+   "entrega": "Llegó tarde",
+   "nota": 2.565069834225297,
+   "ordenes": 7661
+  }
+ ],
+ "regiones": [
+  {
+   "region": "Southeast",
+   "facturacion": 9966292.38,
+   "clientes": 63987
+  },
+  {
+   "region": "South",
+   "facturacion": 2237439.39,
+   "clientes": 13379
+  },
+  {
+   "region": "Northeast",
+   "facturacion": 1823337.63,
+   "clientes": 8806
+  },
+  {
+   "region": "Center-West",
+   "facturacion": 995897.9,
+   "clientes": 5444
+  },
+  {
+   "region": "North",
+   "facturacion": 401496.35,
+   "clientes": 1742
+  }
+ ]
+}
