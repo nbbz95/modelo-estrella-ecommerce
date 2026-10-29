@@ -1,0 +1,38 @@
+name: dbt build y GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DO_NOT_TRACK: "1"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Descargar datos de Olist
+        run: ./scripts/descargar_datos.sh
+      - name: dbt build (modelos + tests)
+        run: dbt build --profiles-dir .
+      - name: Documentación
+        run: dbt docs generate --static --profiles-dir .
+      - name: Sitio
+        run: python scripts/build_site.py
+      - name: Deploy a gh-pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelo estrella e-commerce</title>
+<meta name="description" content="Modelo dimensional (esquema estrella) sobre 100 mil órdenes reales de Olist, construido con dbt y DuckDB, con tests de datos y documentación navegable.">
+<link rel="stylesheet" href="assets/ui.css">
+<style>
+  .erd-wrap { overflow-x: auto; margin: 0 -4px; }
+  .erd { min-width: 640px; max-width: 860px; margin: 0 auto; display: block; }
+  .erd .box rect.body { fill: var(--surface); stroke: var(--ring); }
+  .erd .box rect.head { fill: var(--surface-2); }
+  .erd .box.fact rect.head { fill: var(--s1); }
+  .erd .box.fact text.title { fill: #fff; }
+  .erd text.title { font: 600 12.5px var(--font); fill: var(--ink); }
+  .erd text.col { font: 11.5px ui-monospace, Menlo, Consolas, monospace; fill: var(--ink-2); }
+  .erd text.col.key { fill: var(--ink); font-weight: 600; }
+  .erd path.edge { fill: none; stroke: var(--axis); stroke-width: 1.5; }
+  .erd .box { transition: opacity 160ms ease; }
+  .erd.focus .box:not(.on), .erd.focus path.edge:not(.on) { opacity: 0.3; }
+  .erd path.edge.on { stroke: var(--s1); }
+  .cta { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; background: var(--ink); color: var(--surface); border-color: var(--ink); font-weight: 500; }
+  .layers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .layers > div { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--ink-2); }
+  .layers b { display: block; color: var(--ink); font-size: 14px; margin-bottom: 4px; }
+  @media (max-width: 700px) { .layers { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Modelado de datos · dbt + DuckDB</div>
+      <h1>Modelo estrella de un e-commerce real</h1>
+      <p>100 mil órdenes del marketplace brasileño Olist, de CSV crudos a un modelo dimensional listo para cualquier herramienta de BI. Cada tabla está documentada y testeada.</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="btn cta" href="docs/">Ver documentación y linaje</a>
+      <button class="btn" id="theme" type="button">Auto</button>
+    </div>
+  </header>
+
+  <section class="grid" id="kpis"></section>
+
+  <section class="card reveal" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>El modelo</h2>
+        <p class="sub">Dos tablas de hechos con distinto grano y cuatro dimensiones compartidas. Pasá el mouse por una tabla para ver con qué se relaciona.</p>
+      </div>
+    </div>
+    <div class="erd-wrap"><svg class="erd" id="erd" viewBox="0 0 760 400" role="img" aria-label="Diagrama del esquema estrella"></svg></div>
+  </section>
+
+  <section class="grid" style="margin-top:16px">
+    <div class="card span-12 reveal">
+      <h2>Capas</h2>
+      <p class="sub">Cada capa tiene una sola responsabilidad.</p>
+      <div class="layers">
+        <div><b>Fuentes</b>8 CSV públicos de Olist, leídos directo por DuckDB sin pasos manuales.</div>
+        <div><b>Staging</b>Vistas que tipan, renombran y deduplican (por ejemplo, la última reseña de cada orden).</div>
+        <div><b>Marts</b>Hechos y dimensiones materializados como tablas, con claves de negocio y atributos derivados.</div>
+      </div>
+    </div>
+    <div class="card span-6 reveal">
+      <h2>Facturación por categoría</h2>
+      <p class="sub">Top 8, órdenes entregadas, en BRL. Sale de fct_order_items + dim_products.</p>
+      <div id="cats"></div>
+    </div>
+    <div class="card span-6 reveal">
+      <h2>Lo que el modelo permite responder</h2>
+      <p class="sub">Puntualidad contra satisfacción: fct_orders.</p>
+      <div id="late"></div>
+      <p class="callout" id="late-note" style="margin-top:14px"></p>
+    </div>
+    <div class="card span-12 reveal">
+      <h2>Tablas y grano</h2>
+      <p class="sub">Definir el grano primero es lo que evita duplicar montos al cruzar tablas.</p>
+      <div id="tables"></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    Datos: <a href="https://github.com/olist/work-at-olist-data">Olist, Brazilian E-Commerce Public Dataset</a> (2016-2018). Código en
+    <a href="https://github.com/nbbz95/modelo-estrella-ecommerce">GitHub</a>.
+  </footer>
+</div>
+
+<script src="assets/charts.js"></script>
+<script>
+const brl = (v) => "R$ " + Math.round(v).toLocaleString("es-AR");
+const brlM = (v) => "R$ " + (v / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M";
+const num = (v) => Math.round(v).toLocaleString("es-AR");
+
+const BOXES = {
+  dim_products:   { x: 20,  y: 30,  cols: ["product_key", "category", "size_band", "weight_g"] },
+  dim_date:       { x: 20,  y: 250, cols: ["date_key", "year_month", "quarter", "is_weekend"] },
+  fct_order_items:{ x: 280, y: 30,  fact: true, cols: ["order_id, order_item_id", "purchase_date_key", "customer_key", "product_key", "seller_key", "gross_value"] },
+  fct_orders:     { x: 280, y: 240, fact: true, cols: ["order_id", "purchase_date_key", "customer_key", "gross_value", "is_late", "review_score"] },
+  dim_sellers:    { x: 540, y: 30,  cols: ["seller_key", "state", "region"] },
+  dim_customers:  { x: 540, y: 250, cols: ["customer_key", "state", "region", "lifetime_orders"] },
+};
+const EDGES = [
+  ["fct_order_items", "dim_products"], ["fct_order_items", "dim_sellers"], ["fct_order_items", "dim_date"],
+  ["fct_order_items", "dim_customers"], ["fct_orders", "dim_date"], ["fct_orders", "dim_customers"],
+];
+const W = 200, ROW = 18, HEAD = 28;
+const size = (b) => HEAD + b.cols.length * ROW + 10;
+
+function drawErd() {
+  const svg = document.getElementById("erd");
+  let s = "";
+  EDGES.forEach(([a, b], i) => {
+    const A = BOXES[a], B = BOXES[b];
+    const ay = A.y + size(A) / 2, by = B.y + size(B) / 2;
+    const left = B.x < A.x;
+    const x1 = left ? A.x : A.x + W, x2 = left ? B.x + W : B.x;
+    const mx = (x1 + x2) / 2;
+    s += `<path class="edge" data-a="${a}" data-b="${b}" d="M${x1},${ay} C${mx},${ay} ${mx},${by} ${x2},${by}"/>`;
+  });
+  for (const [name, b] of Object.entries(BOXES)) {
+    const h = size(b);
+    s += `<g class="box${b.fact ? " fact" : ""}" data-name="${name}" tabindex="0">
+      <rect class="body" x="${b.x}" y="${b.y}" width="${W}" height="${h}" rx="10"/>
+      <path class="head-path" d="M${b.x},${b.y + 10} Q${b.x},${b.y} ${b.x + 10},${b.y} H${b.x + W - 10} Q${b.x + W},${b.y} ${b.x + W},${b.y + 10} V${b.y + HEAD} H${b.x} Z" fill="${b.fact ? "var(--s1)" : "var(--surface-2)"}"/>
+      <text class="title" x="${b.x + 12}" y="${b.y + 19}">${name}</text>
+      ${b.cols.map((c, i) => `<text class="col${i === 0 ? " key" : ""}" x="${b.x + 12}" y="${b.y + HEAD + 16 + i * ROW}">${i === 0 ? "🔑 " : ""}${c}</text>`).join("")}
+    </g>`;
+  }
+  svg.innerHTML = s;
+  const focus = (name) => {
+    svg.classList.toggle("focus", !!name);
+    svg.querySelectorAll(".box").forEach((g) => g.classList.remove("on"));
+    svg.querySelectorAll(".edge").forEach((e) => e.classList.remove("on"));
+    if (!name) return;
+    svg.querySelector(`.box[data-name="${name}"]`).classList.add("on");
+    svg.querySelectorAll(".edge").forEach((e) => {
+      if (e.dataset.a === name || e.dataset.b === name) {
+        e.classList.add("on");
+        svg.querySelector(`.box[data-name="${e.dataset.a === name ? e.dataset.b : e.dataset.a}"]`).classList.add("on");
+      }
+    });
+  };
+  svg.querySelectorAll(".box").forEach((g) => {
+    g.addEventListener("pointerenter", () => focus(g.dataset.name));
+    g.addEventListener("focus", () => focus(g.dataset.name));
+    g.addEventListener("pointerleave", () => focus(null));
+    g.addEventListener("blur", () => focus(null));
+  });
+}
+drawErd();
+
+fetch("data.json").then((r) => r.json()).then((d) => {
+  const k = d.kpis;
+  const tiles = [
+    ["Facturación entregada", brlM(k.facturacion), "productos + flete"],
+    ["Órdenes entregadas", num(k.ordenes), "2016-2018"],
+    ["Ticket promedio", brl(k.ticket), "por orden"],
+    ["Clientes que recompran", (d.recompra * 100).toFixed(1).replace(".", ",") + "%", "con más de una orden"],
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(([l, v, s]) =>
+    `<div class="card kpi span-3 reveal"><div class="label">${l}</div><div class="value">${v}</div><div class="delta">${s}</div></div>`).join("");
+
+  const cats = Charts.bars("#cats", {
+    items: d.categorias.map((c) => ({ label: c.categoria.replaceAll("_", " "), value: c.facturacion })),
+    fmt: brlM, valueName: "Facturación", labelWidth: 150,
+  });
+  const late = Charts.bars("#late", {
+    items: d.atraso_vs_nota.map((c, i) => ({ label: c.entrega, value: c.nota, note: num(c.ordenes) + " órdenes", color: i ? "var(--s2)" : "var(--s1)" })),
+    fmt: (v) => v.toFixed(2).replace(".", ",") + " / 5", valueName: "Nota promedio", labelWidth: 120,
+  });
+  const [onTime, isLate] = [d.atraso_vs_nota.find((x) => x.entrega === "Llegó a tiempo"), d.atraso_vs_nota.find((x) => x.entrega === "Llegó tarde")];
+  document.getElementById("late-note").textContent =
+    `Las órdenes que llegan tarde (${(k.tasa_atraso * 100).toFixed(1).replace(".", ",")}% del total) tienen una nota ${(onTime.nota - isLate.nota).toFixed(1).replace(".", ",")} puntos más baja. La logística es la palanca más directa de satisfacción.`;
+
+  Charts.table("#tables", ["Tabla", "Grano (una fila =)", "Filas"], d.tablas.map((t) => [`<code>${t.nombre}</code>`, t.grano, num(t.filas)]));
+  document.querySelectorAll("#tables td:nth-child(2)").forEach((td) => td.classList.add("text"));
+
+  Charts.themeToggle(document.getElementById("theme"), () => { cats.redraw(); late.redraw(); },
+    { system: "Auto", light: "Claro", dark: "Oscuro", prefix: "Tema" });
+});
+</script>
+</body>
+</html>

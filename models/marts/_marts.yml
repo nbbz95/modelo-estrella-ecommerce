@@ -1,0 +1,99 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: Calendario de 2016 a 2018. Clave entera AAAAMMDD.
+    columns:
+      - name: date_key
+        description: Fecha como entero AAAAMMDD.
+        data_tests: [unique, not_null]
+
+  - name: dim_customers
+    description: >
+      Una fila por cliente real (customer_unique_id). Ubicación de su última compra,
+      primera y última fecha de compra y cantidad de órdenes.
+    columns:
+      - name: customer_key
+        data_tests: [unique, not_null]
+      - name: region
+        description: Región de Brasil derivada del estado.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [Southeast, South, Center-West, Northeast, North]
+      - name: lifetime_orders
+        description: Órdenes del cliente en todo el período.
+
+  - name: dim_products
+    description: Productos con categoría en inglés y franja de tamaño.
+    columns:
+      - name: product_key
+        data_tests: [unique, not_null]
+
+  - name: dim_sellers
+    description: Vendedores del marketplace con estado y región.
+    columns:
+      - name: seller_key
+        data_tests: [unique, not_null]
+
+  - name: fct_order_items
+    description: >
+      Hecho de ventas al grano más fino: una línea de orden. Es la tabla para
+      analizar ventas por producto, categoría, vendedor o región.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [order_id, order_item_id]
+    columns:
+      - name: purchase_date_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: customer_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+      - name: product_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_key
+      - name: seller_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_key
+      - name: gross_value
+        description: Precio más flete de la línea.
+
+  - name: fct_orders
+    description: >
+      Hecho a nivel orden: montos, medio de pago, tiempos de entrega y reseña.
+      Es la tabla para ticket promedio, puntualidad y satisfacción.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_key
+      - name: purchase_date_key
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: is_late
+        description: Entregada después de la fecha estimada. Nulo si no se entregó.
+      - name: days_vs_estimate
+        description: Días de diferencia contra la fecha estimada (negativo = llegó antes).
